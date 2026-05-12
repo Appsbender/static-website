@@ -42,6 +42,27 @@
             max-width: 500px;
             padding: .6rem 2.8rem;
         }
+
+        .floating-logo {
+            max-width: 120px;
+            animation: float 3s ease-in-out infinite;
+            filter: drop-shadow(0 10px 20px rgba(255, 255, 255, 0.15));
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-12px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
     </style>
 
 </head>
@@ -49,10 +70,15 @@
 <body>
     <div class="main-wrapper">
         <section class="content">
-            <img src="mono-logo.svg" style="max-width: 120px;" />
+            <img src="mono-logo.svg"  class="floating-logo" style="max-width: 120px;" />
             <p>I'm currently working on improving my website to provide you with a better experience. Check back soon
-                for updates!</p>
-            <p>Thank you for your patience</p>
+                for updates!
+                <br /><br />
+                If you need to get in touch, you can reach me via email at:
+                <span style="text-decoration: underline;">regz24@gmail.com</span>
+                <br /><br />
+                Thank you for your patience and support.
+            </p>
         </section>
     </div>
 </body>
