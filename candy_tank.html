@@ -455,6 +455,28 @@
         height: 64px;
       }
     }
+
+    /* Invisible movement area; joystick appears only while touching. */
+    #joystickZone { width: 48%; height: 190px; position: relative; touch-action: none; pointer-events: auto; }
+    #joystickVisual { position: fixed; width: 112px; height: 112px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.38); background: rgba(255,255,255,.12);
+      box-shadow: 0 0 18px rgba(0,0,0,.18); pointer-events: none;
+      opacity: 0; transition: opacity .1s; z-index: 8; transform: translate(-50%,-50%); }
+    #joystickVisual.active { opacity: 1; }
+    #joystickKnob { position: absolute; width: 49px; height: 49px; left: 50%; top: 50%;
+      transform: translate(-50%,-50%); border-radius: 50%; background: rgba(195,255,211,.55);
+      border: 2px solid rgba(255,255,255,.65); box-shadow: inset 0 2px 10px rgba(255,255,255,.25); }
+    @media (max-width: 768px), (pointer: coarse) { #joystickZone { pointer-events: auto; } }
+    /* A small hint in the bottom-left movement zone, hidden while dragging. */
+    #joystickHint { position: absolute; left: 10px; bottom: 16px; max-width: 160px;
+      padding: 8px 10px; border-radius: 10px; background: rgba(25, 20, 40, .55);
+      border: 1px solid rgba(255,255,255,.25); color: rgba(255,255,255,.94);
+      font-size: 11px; line-height: 1.35; letter-spacing: .1px;
+      text-shadow: 0 1px 2px rgba(0,0,0,.6); pointer-events: none;
+      transition: opacity .15s; }
+    #joystickZone.touching #joystickHint { opacity: 0; }
+    @media (min-width: 769px) and (pointer: fine) { #joystickHint { display: none; } }
+
   </style>
 </head>
 
@@ -486,16 +508,9 @@
   </div>
 
   <div id="mobileControls">
-    <div class="dpad">
-      <div class="dpad-empty"></div>
-      <div class="dpad-btn" data-key="ArrowUp">&#9650;</div>
-      <div class="dpad-empty"></div>
-      <div class="dpad-btn" data-key="ArrowLeft">&#9664;</div>
-      <div class="dpad-empty"></div>
-      <div class="dpad-btn" data-key="ArrowRight">&#9654;</div>
-      <div class="dpad-empty"></div>
-      <div class="dpad-btn" data-key="ArrowDown">&#9660;</div>
-      <div class="dpad-empty"></div>
+    <div id="joystickZone" aria-label="Touch and drag to move tank">
+      <div id="joystickHint">Touch &amp; drag here to move<br>A joystick will appear</div>
+      <div id="joystickVisual"><div id="joystickKnob"></div></div>
     </div>
     <div class="action-btns">
       <div class="action-btn pause" data-key="p">II</div>
@@ -1276,35 +1291,52 @@
 
       // Mobile touch controls
       function setupMobileControls() {
-        const dpadBtns = document.querySelectorAll(".dpad-btn");
         const actionBtns = document.querySelectorAll(".action-btn");
-
-        dpadBtns.forEach(btn => {
-          const key = btn.dataset.key;
-
-          const startHandler = (e) => {
-            e.preventDefault();
-            keys[key] = true;
-            btn.style.transform = "scale(0.92)";
-          };
-          const endHandler = (e) => {
-            e.preventDefault();
-            keys[key] = false;
-            btn.style.transform = "scale(1)";
-          };
-          const cancelHandler = (e) => {
-            e.preventDefault();
-            keys[key] = false;
-            btn.style.transform = "scale(1)";
-          };
-
-          btn.addEventListener("touchstart", startHandler, { passive: false });
-          btn.addEventListener("touchend", endHandler, { passive: false });
-          btn.addEventListener("touchcancel", cancelHandler, { passive: false });
-          btn.addEventListener("mousedown", startHandler);
-          btn.addEventListener("mouseup", endHandler);
-          btn.addEventListener("mouseleave", cancelHandler);
+        const zone = document.getElementById("joystickZone");
+        const visual = document.getElementById("joystickVisual");
+        const knob = document.getElementById("joystickKnob");
+        let activePointer = null, originX = 0, originY = 0;
+        const movementKeys = ["ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"];
+        function clearJoystick() {
+          movementKeys.forEach(k => keys[k] = false);
+          activePointer = null;
+          visual.classList.remove("active");
+          zone.classList.remove("touching");
+          knob.style.transform = "translate(-50%,-50%)";
+        }
+        function moveJoystick(e) {
+          const dx = e.clientX - originX, dy = e.clientY - originY;
+          const length = Math.hypot(dx, dy);
+          const radius = 37;
+          const factor = length > radius ? radius / length : 1;
+          knob.style.transform = `translate(calc(-50% + ${dx * factor}px),calc(-50% + ${dy * factor}px))`;
+          movementKeys.forEach(k => keys[k] = false);
+          if (length < 12) return;
+          // Tank uses four cardinal directions, so choose the dominant axis.
+          if (Math.abs(dx) > Math.abs(dy)) keys[dx > 0 ? "ArrowRight" : "ArrowLeft"] = true;
+          else keys[dy > 0 ? "ArrowDown" : "ArrowUp"] = true;
+        }
+        zone.addEventListener("pointerdown", e => {
+          if (activePointer !== null || !running || paused) return;
+          e.preventDefault();
+          activePointer = e.pointerId;
+          originX = e.clientX; originY = e.clientY;
+          visual.style.left = originX + "px";
+          visual.style.top = originY + "px";
+          visual.classList.add("active");
+          zone.classList.add("touching");
+          zone.setPointerCapture(e.pointerId);
+          moveJoystick(e);
         });
+        zone.addEventListener("pointermove", e => {
+          if (e.pointerId === activePointer) { e.preventDefault(); moveJoystick(e); }
+        });
+        for (const eventName of ["pointerup", "pointercancel", "lostpointercapture"]) {
+          zone.addEventListener(eventName, e => {
+            if (e.pointerId === activePointer) clearJoystick();
+          });
+        }
+        window.addEventListener("blur", clearJoystick);
 
         actionBtns.forEach(btn => {
           const key = btn.dataset.key;
