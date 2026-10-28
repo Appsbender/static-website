@@ -612,6 +612,54 @@
       } catch (e) { }
       highScoreEl.textContent = String(highScore);
 
+      // Lightweight synthesized effects: no external audio files or network needed.
+      let audioContext = null;
+      let soundEnabled = true;
+      function unlockAudio() {
+        if (!soundEnabled) return;
+        try {
+          const AudioCtor = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtor) return;
+          if (!audioContext) audioContext = new AudioCtor();
+          if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+        } catch (_) { /* Audio is optional on unsupported devices. */ }
+      }
+      function tone(startHz, endHz, duration, volume, waveType = "square") {
+        if (!soundEnabled || !audioContext || audioContext.state !== "running") return;
+        try {
+          const now = audioContext.currentTime;
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = waveType;
+          osc.frequency.setValueAtTime(startHz, now);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, endHz), now + duration);
+          gain.gain.setValueAtTime(Math.max(0.0001, volume), now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.start(now);
+          osc.stop(now + duration + 0.01);
+        } catch (_) { /* Never let audio interrupt gameplay. */ }
+      }
+      let lastEnemyShotSound = 0;
+      function playSound(effect) {
+        if (effect === "shoot") tone(620, 190, 0.095, 0.055, "square");
+        else if (effect === "enemyShoot") {
+          const now = performance.now();
+          if (now - lastEnemyShotSound < 160) return;
+          lastEnemyShotSound = now;
+          tone(230, 110, 0.075, 0.012, "triangle");
+        } else if (effect === "brick") tone(340, 90, 0.115, 0.075, "triangle");
+        else if (effect === "steel") tone(980, 540, 0.075, 0.042, "sine");
+        else if (effect === "enemyHit") {
+          tone(220, 55, 0.23, 0.11, "sawtooth");
+          tone(440, 120, 0.13, 0.035, "triangle");
+        } else if (effect === "playerHit") tone(470, 65, 0.3, 0.12, "sawtooth");
+        else if (effect === "baseHit") tone(260, 35, 0.48, 0.15, "sawtooth");
+      }
+      document.addEventListener("pointerdown", unlockAudio, { passive: true });
+      document.addEventListener("keydown", unlockAudio);
+
       // Game state
       let running = false;
       let paused = false;
@@ -877,6 +925,7 @@
               owner: "player",
               life: 120
             });
+            playSound("shoot");
             player.shootTimer = player.shootDelay;
           }
         }
@@ -956,6 +1005,7 @@
               owner: "enemy",
               life: 120
             });
+            playSound("enemyShoot");
             e.shootTimer = 0;
           }
         }
@@ -982,9 +1032,11 @@
               if (wall.type === "brick") {
                 walls.splice(w, 1);
                 createParticles(b.x, b.y, "#e99df5", 9);
+                playSound("brick");
                 hitWall = true;
               } else if (wall.type === "steel") {
                 createParticles(b.x, b.y, "#90a4ae", 3);
+                playSound("steel");
                 hitWall = true;
               }
               break;
@@ -998,6 +1050,7 @@
           if (base && base.alive && base.c === bc_ && base.r === br_) {
             base.alive = false;
             createParticles(b.x, b.y, "#f44336", 20);
+            playSound("baseHit");
             bullets.splice(i, 1);
             gameOver("Base Destroyed!");
             continue;
@@ -1010,6 +1063,7 @@
               if (rectHit(b.x - bw / 2, b.y - bh / 2, bw, bh, e.x + 2, e.y + 2, TANK_SIZE - 4, TANK_SIZE - 4)) {
                 e.alive = false;
                 createParticles(b.x, b.y, "#f44336", 12);
+                playSound("enemyHit");
                 score += 100;
                 updateUI();
                 bullets.splice(i, 1);
@@ -1022,6 +1076,7 @@
                 lives--;
                 player.invincible = 90;
                 createParticles(b.x, b.y, "#4caf50", 12);
+                playSound("playerHit");
                 updateUI();
                 bullets.splice(i, 1);
                 if (lives <= 0) {
@@ -1405,6 +1460,7 @@
       }, { passive: false });
 
       startBtn.addEventListener("click", () => {
+        unlockAudio();
         if (running && paused) {
           setPaused(false); // Resume the existing round, do not reset the map.
           return;
