@@ -565,7 +565,7 @@
       const TILE = 32;
       const COLS = 20;
       let ROWS = 15;
-      const TANK_SIZE = 26;
+      const TANK_SIZE = 30;
       const TANK_SPEED = 2.2;
       const BULLET_SPEED = 5.5;
       const ENEMY_BULLET_SPEED = 4.0;
@@ -837,8 +837,8 @@
           player.shootTimer--;
           if ((keys[" "]) && player.shootTimer <= 0) {
             const v = DIR_VEC[player.dir];
-            const cx = player.x + TANK_SIZE / 2 + v.x * 14;
-            const cy = player.y + TANK_SIZE / 2 + v.y * 14;
+            const cx = player.x + TANK_SIZE / 2 + v.x * (TANK_SIZE / 2 + 2);
+            const cy = player.y + TANK_SIZE / 2 + v.y * (TANK_SIZE / 2 + 2);
             bullets.push({
               x: cx,
               y: cy,
@@ -919,8 +919,8 @@
           if (e.shootTimer >= e.shootDelay) {
             const bv = DIR_VEC[e.dir];
             bullets.push({
-              x: e.x + TANK_SIZE / 2 + bv.x * 14,
-              y: e.y + TANK_SIZE / 2 + bv.y * 14,
+              x: e.x + TANK_SIZE / 2 + bv.x * (TANK_SIZE / 2 + 2),
+              y: e.y + TANK_SIZE / 2 + bv.y * (TANK_SIZE / 2 + 2),
               vx: bv.x * ENEMY_BULLET_SPEED,
               vy: bv.y * ENEMY_BULLET_SPEED,
               owner: "enemy",
@@ -1033,18 +1033,7 @@
         }
 
         if (base && base.alive) {
-          const x = base.c * TILE;
-          const y = base.r * TILE;
-          ctx.fillStyle = "#e53935";
-          ctx.fillRect(x + 6, y + 6, TILE - 12, TILE - 12);
-          ctx.strokeStyle = "#ffcdd2";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x + 6, y + 6, TILE - 12, TILE - 12);
-          ctx.fillStyle = "#fff";
-          ctx.font = "bold 14px monospace";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("B", x + TILE / 2, y + TILE / 2);
+          drawCandyBase(base.c * TILE, base.r * TILE);
         }
 
         for (const w of walls) {
@@ -1060,7 +1049,7 @@
         if (player && player.alive) {
           const flash = player.invincible > 0 && Math.floor(Date.now() / 80) % 2 === 0;
           if (!flash) {
-            drawTank(player.x, player.y, player.dir, "#4caf50", "#81c784");
+            drawTank(player.x, player.y, player.dir, "#4caf50", "#81c784", true);
           }
         }
 
@@ -1157,52 +1146,88 @@
         ctx.restore();
       }
 
-      function drawTank(x, y, dir, bodyColor, turretColor) {
+      // Red jelly-candy house, larger than the old base icon while staying
+      // inside its collision tile and the surrounding protective bricks.
+      function drawCandyBase(x, y) {
+        ctx.save();
+        ctx.shadowColor = "rgba(255,55,105,.7)";
+        ctx.shadowBlur = 12;
+        const fill = ctx.createLinearGradient(x + 2, y + 2, x + 30, y + 30);
+        fill.addColorStop(0, "#ffb2c2");
+        fill.addColorStop(.38, "#ff456a");
+        fill.addColorStop(1, "#bc164d");
+        roundRectPath(x + 2, y + 2, 28, 28, 7);
+        ctx.fillStyle = fill; ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "#ffd9e4"; ctx.lineWidth = 1.6; ctx.stroke();
+        const roof = ctx.createLinearGradient(x, y + 5, x, y + 17);
+        roof.addColorStop(0, "#fff2f5"); roof.addColorStop(1, "#ff91a9");
+        ctx.fillStyle = roof;
+        ctx.beginPath(); ctx.moveTo(x + 5, y + 16); ctx.lineTo(x + 16, y + 5);
+        ctx.lineTo(x + 27, y + 16); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#a71947";
+        roundRectPath(x + 9, y + 15, 14, 12, 3); ctx.fill();
+        ctx.fillStyle = "#fff1f5";
+        roundRectPath(x + 14, y + 18, 5, 9, 2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,.65)";
+        ctx.beginPath(); ctx.ellipse(x + 9, y + 7, 4, 2, -.4, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      function drawTank(x, y, dir, bodyColor, turretColor, isPlayer = false) {
         const w = TANK_SIZE;
         const h = TANK_SIZE;
-
-        ctx.fillStyle = "#2a2a2a";
+        ctx.save();
+        // Keep the physical footprint consistent with tank collision detection.
+        ctx.fillStyle = "#26313b";
         if (dir === DIR.UP || dir === DIR.DOWN) {
-          ctx.fillRect(x, y, 5, h);
-          ctx.fillRect(x + w - 5, y, 5, h);
-          ctx.fillStyle = "#444";
-          for (let i = 0; i < h; i += 6) {
-            ctx.fillRect(x, y + i, 5, 3);
-            ctx.fillRect(x + w - 5, y + i, 5, 3);
+          roundRectPath(x, y, 6, h, 2); ctx.fill();
+          roundRectPath(x + w - 6, y, 6, h, 2); ctx.fill();
+          ctx.fillStyle = "#647184";
+          for (let i = 3; i < h - 2; i += 6) {
+            ctx.fillRect(x + 1, y + i, 4, 2);
+            ctx.fillRect(x + w - 5, y + i, 4, 2);
           }
         } else {
-          ctx.fillStyle = "#2a2a2a";
-          ctx.fillRect(x, y, w, 5);
-          ctx.fillRect(x, y + h - 5, w, 5);
-          ctx.fillStyle = "#444";
-          for (let i = 0; i < w; i += 6) {
-            ctx.fillRect(x + i, y, 3, 5);
-            ctx.fillRect(x + i, y + h - 5, 3, 5);
+          roundRectPath(x, y, w, 6, 2); ctx.fill();
+          roundRectPath(x, y + h - 6, w, 6, 2); ctx.fill();
+          ctx.fillStyle = "#647184";
+          for (let i = 3; i < w - 2; i += 6) {
+            ctx.fillRect(x + i, y + 1, 2, 4);
+            ctx.fillRect(x + i, y + h - 5, 2, 4);
           }
         }
-
-        ctx.fillStyle = bodyColor;
-        ctx.fillRect(x + 5, y + 5, w - 10, h - 10);
-
-        ctx.strokeStyle = turretColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
-
-        ctx.fillStyle = turretColor;
-        ctx.beginPath();
-        ctx.arc(x + w / 2, y + h / 2, 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = "#ccc";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(x + w / 2, y + h / 2);
-        if (dir === DIR.UP) ctx.lineTo(x + w / 2, y + 3);
-        else if (dir === DIR.RIGHT) ctx.lineTo(x + w - 3, y + h / 2);
-        else if (dir === DIR.DOWN) ctx.lineTo(x + w / 2, y + h - 3);
-        else if (dir === DIR.LEFT) ctx.lineTo(x + 3, y + h / 2);
-        ctx.stroke();
+        const gradient = ctx.createLinearGradient(x + 5, y + 4, x + w - 4, y + h - 4);
+        if (isPlayer) {
+          gradient.addColorStop(0, "#d4ffae");
+          gradient.addColorStop(.38, "#65e77c");
+          gradient.addColorStop(1, "#159b56");
+          ctx.shadowColor = "rgba(80,255,135,.45)";
+          ctx.shadowBlur = 7;
+        } else {
+          gradient.addColorStop(0, "#ffb6b6");
+          gradient.addColorStop(.4, "#ff5b67");
+          gradient.addColorStop(1, "#c8294a");
+        }
+        roundRectPath(x + 5, y + 4, w - 10, h - 8, 6);
+        ctx.fillStyle = gradient; ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = isPlayer ? "#e4ffd5" : "#ffbec8";
+        ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.5)";
+        roundRectPath(x + 8, y + 6, w - 16, 6, 3); ctx.fill();
+        const cx = x + w / 2, cy = y + h / 2;
+        ctx.fillStyle = isPlayer ? "#38b85d" : turretColor;
+        ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 1.5; ctx.stroke();
+        const v = DIR_VEC[dir];
+        ctx.strokeStyle = isPlayer ? "#d3ffb4" : "#ffe0e3";
+        ctx.lineWidth = 4; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + v.x * 12, cy + v.y * 12); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.7)";
+        ctx.beginPath(); ctx.arc(cx - 2, cy - 3, 2.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
       }
 
       function gameOver(reason) {
